@@ -1,0 +1,6 @@
+(library 
+  (name ocamlintroproject)
+  (modules basics funs))
+(env
+  (dev
+    (flags (:standard -w -A))))

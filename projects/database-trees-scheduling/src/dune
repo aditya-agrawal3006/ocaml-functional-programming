@@ -1,0 +1,9 @@
+(library
+ (name p2)
+ (modules tree db scheduling)
+ (preprocess
+  (pps ppx_jane ppx_deriving.show ppx_inline_test ppx_assert)))
+
+(env
+  (dev
+    (flags (:standard -w -11-12-20-26-31-32-33-56-60-27-39))))
