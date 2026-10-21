@@ -1,0 +1,13 @@
+_build/
+*.cmi
+*.cmo
+*.cmx
+*.cmxa
+*.cma
+*.o
+*.a
+*.exe
+*.bc
+output.png
+output.viz
+.DS_Store
