@@ -19,8 +19,7 @@ open Utils
 
 (*******************************)
 (* Thompson-style regular expression construction *)
-(*******************************)
-
+(** Build an epsilon-NFA from a regular-expression tree using Thompson's construction. *)
 let rec regexp_to_nfa (regexp: regexp_t) : (int, char) nfa_t = 
   match regexp with
     | Empty_String -> let ss = fresh () in
@@ -53,8 +52,11 @@ let rec regexp_to_nfa (regexp: regexp_t) : (int, char) nfa_t =
                 (sigma1, [ss;fs] @ qs1, ss, [fs],  start @ delta1 @ again @ finish)
 
 (* Parsing and presentation helpers *)
+(** Tokenize and parse a string into a regular-expression tree. *)
 let regexp_of_string str = parse_regexp @@ tokenize str
 
+(** Convert a regular-expression tree back into a string. *)
 let string_of_regexp regex = regexp_to_string regex
 
+(** Parse a regular-expression string and build its NFA. *)
 let nfa_of_string str = regexp_to_nfa @@ regexp_of_string str
