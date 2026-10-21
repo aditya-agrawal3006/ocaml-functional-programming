@@ -9,4 +9,4 @@ Selected OCaml implementations from University of Maryland coursework, organized
 
 Each project includes its OCaml source, module interfaces, Dune build configuration, and a project README. Course-specific tests, GitLab workflows, late-token files, and compiled build output are excluded.
 
-> University of Maryland coursework. Some interfaces and specifications were provided by the course. The implementations have not been independently tested in this portfolio copy.
+> Some projects are part of University of Maryland coursework. Some interfaces and specifications were provided by a course. The coursework project implementations have not been independently tested in this portfolio copy.
