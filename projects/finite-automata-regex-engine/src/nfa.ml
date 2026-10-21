@@ -19,8 +19,9 @@ open Utils
 
 (****************)
 (* NFA simulation *)
-(****************)
-
+(** Find the states reachable from [qs] by one transition on [s].
+   [None] represents an epsilon transition.
+*)
 let move (nfa: ('q,'s) nfa_t) (qs: 'q list) (s: 's option) : 'q list =
   let (sigma, _, _, _, delta) = nfa in
   match s with
@@ -32,7 +33,9 @@ let move (nfa: ('q,'s) nfa_t) (qs: 'q list) (s: 's option) : 'q list =
            []
            delta
 
+(** Find every state reachable through zero or more epsilon transitions. *)
 let e_closure (nfa: ('q,'s) nfa_t) (qs: 'q list) : 'q list =
+  (** Expand the epsilon closure until no new states can be reached. *)
   let rec helper states = 
     let next = move nfa states None in
     let all = union states next in
@@ -40,8 +43,10 @@ let e_closure (nfa: ('q,'s) nfa_t) (qs: 'q list) : 'q list =
     else helper all
   in helper qs
 
+(** Check whether the NFA accepts a string, following epsilon transitions. *)
 let accept (nfa: ('q,char) nfa_t) (s: string) : bool =
   let (_, _, ss, fs, _) = nfa in
+  (** Consume the input characters while tracking all reachable states. *)
   let rec helper states c = 
     match c with
     | [] -> List.exists (fun x -> elem x fs) states
@@ -52,23 +57,25 @@ let accept (nfa: ('q,char) nfa_t) (s: string) : bool =
 
 (*******************************)
 (* Determinization through subset construction *)
-(*******************************)
-
+(** Find the successor state sets for each symbol in the alphabet. *)
 let new_states (nfa: ('q,'s) nfa_t) (qs: 'q list) : 'q list list =
   let (sigma, _,_,_,_) = nfa in 
   List.map (fun c -> e_closure nfa (move nfa qs (Some c))) sigma
 
+(** Create DFA transitions from [qs] to each successor state set. *)
 let new_trans (nfa: ('q,'s) nfa_t) (qs: 'q list) : ('q list, 's) transition list =
   let (sigma, _,_,_,_) = nfa in
   List.map (fun c -> let next = move nfa qs (Some c) in
                      let fs = e_closure nfa next in
                      {input = Some c; states = (qs, fs)}) sigma
 
+(** Mark a DFA state as final if it contains any final NFA state. *)
 let new_finals (nfa: ('q,'s) nfa_t) (qs: 'q list) : 'q list list =
   let (_, _, _, fs, _) = nfa in 
   if intersection qs fs = [] then [] 
                              else [qs]
 
+(** Process pending state sets and extend the DFA by subset construction. *)
 let rec nfa_to_dfa_step (nfa: ('q,'s) nfa_t) (dfa: ('q list, 's) nfa_t)
     (work: 'q list list) : ('q list, 's) nfa_t =
   match work with
@@ -81,6 +88,7 @@ let rec nfa_to_dfa_step (nfa: ('q,'s) nfa_t) (dfa: ('q list, 's) nfa_t)
                 let delta2 = union delta (new_trans nfa h) in
                 nfa_to_dfa_step nfa (sigma, qs2, q0, fs2, delta2) (t @ unique)
 
+(** Convert an NFA to a DFA using epsilon-closed sets of states. *)
 let nfa_to_dfa (nfa: ('q,'s) nfa_t) : ('q list, 's) nfa_t =
   let (sigma, _, q0, _, _) = nfa in
   let ss = e_closure nfa [q0] in
@@ -89,38 +97,45 @@ let nfa_to_dfa (nfa: ('q,'s) nfa_t) : ('q list, 's) nfa_t =
 
 (*******************************)
 (* DFA to regular expression  *)
-(*******************************)
-
+(** Convert a DFA into a regular expression using state elimination.
+   An empty language cannot be represented by the current regexp type.
+*)
 let dfa_to_regex (dfa: ('q, char) nfa_t) : regexp_t =
   let (_, qs, q0, fs, delta) = dfa in
   let states = List.sort_uniq compare
     (q0 :: (qs @ fs @ List.concat_map
       (fun t -> let (a, b) = t.states in [a; b]) delta)) in
   let indexed = List.mapi (fun i q -> (q, i)) states in
+  (** Look up the numeric index assigned to an automaton state. *)
   let index q = List.assoc q indexed in
   let start = List.length states in
   let finish = start + 1 in
 
   (* Missing edges represent the empty language. *)
+  (** Return the expression labeling an edge, or [None] if absent. *)
   let get edges a b = List.assoc_opt (a, b) edges in
+  (** Combine alternative paths, treating [None] as no path. *)
   let union_regex a b =
     match a, b with
     | None, r | r, None -> r
     | Some x, Some y when x = y -> Some x
     | Some x, Some y -> Some (Union (x, y))
   in
+  (** Join two consecutive paths, using epsilon as the identity. *)
   let concat_regex a b =
     match a, b with
     | None, _ | _, None -> None
     | Some Empty_String, r | r, Some Empty_String -> r
     | Some x, Some y -> Some (Concat (x, y))
   in
+  (** Allow a path to repeat zero or more times. *)
   let star_regex r =
     match r with
     | None | Some Empty_String -> Some Empty_String
     | Some (Star _ as x) -> Some x
     | Some x -> Some (Star x)
   in
+  (** Insert an edge, merging the expression if a parallel edge exists. *)
   let add edges a b r =
     let combined = union_regex (get edges a b) (Some r) in
     let remaining = List.remove_assoc (a, b) edges in
@@ -144,6 +159,7 @@ let dfa_to_regex (dfa: ('q, char) nfa_t) : regexp_t =
     (fun acc q -> add acc (index q) finish Empty_String) edges fs in
 
   (* Remove each original state, combining every path through it. *)
+  (** Eliminate each intermediate state and update the remaining paths. *)
   let rec eliminate edges pending =
     match pending with
     | [] ->
