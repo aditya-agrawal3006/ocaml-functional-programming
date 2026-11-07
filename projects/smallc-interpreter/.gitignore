@@ -1,0 +1,18 @@
+# OCaml / Dune build artifacts
+_build/
+*.cmi
+*.cmo
+*.cmx
+*.cmxa
+*.cma
+*.cmxs
+*.o
+*.a
+*.install
+.merlin
+*.merlin
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store

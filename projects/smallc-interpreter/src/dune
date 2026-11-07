@@ -1,0 +1,8 @@
+(library
+  (name smallc_lang)
+  (modules eval lexer smallCTypes utils parser tokenTypes)
+  (preprocess 
+    (pps ppx_deriving.show)))
+(env
+  (dev
+    (flags (:standard -w -27-32-33-34-39))))

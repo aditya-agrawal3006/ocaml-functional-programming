@@ -1,0 +1,4 @@
+(executable
+  (name interface)
+  (libraries smallc_lang)
+  (modes byte exe))

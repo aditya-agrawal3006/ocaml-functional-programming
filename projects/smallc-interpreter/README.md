@@ -1,49 +1,63 @@
 # SmallC Interpreter | OCaml
 
-A miniature **C-like language interpreter** built in OCaml with a hand-written lexer, a recursive-descent parser, and an AST evaluator. Instead of stopping at tokenization or syntax checking, this project connects all three stages to execute programs with variables, expressions, loops, branches, and function calls.
+A miniature programming language interpreter built in **OCaml**, with a hand-written lexer, a recursive-descent parser, and an evaluator that executes an abstract syntax tree (AST).
 
-> Developed through **University of Maryland coursework**. The language specification, some data types, the command-line driver, and utility scaffolding were provided as starter material. The lexer, parser, and evaluator include my implementation work.
+Rather than recognizing a few isolated expressions, this project connects the major pieces of a programming language into one execution pipeline: it reads source code, understands its structure, checks values and types at runtime, tracks variable bindings, and executes control flow and function calls.
 
-## How the interpreter works
+> **Background:** Developed through University of Maryland coursework. Language specifications, core type definitions, the command-line interface, and some helper utilities were supplied as starter material; the lexer, recursive-descent parser, and evaluator contain my implementation work.
+
+## How it works
 
 ```text
-SmallC source (.c)
-        |
-        v
-1. Lexer (src/lexer.ml)
-   characters -> tokens
-        |
-        v
-2. Parser (src/parser.ml)
-   tokens -> abstract syntax tree (AST)
-        |
-        v
-3. Evaluator (src/eval.ml)
-   AST + execution environment
-        |
-        v
-Program output / updated state
+SmallC program (.c)
+         |
+         v
+  1. Lexer (lexer.ml)
+     characters -> token stream
+         |
+         v
+  2. Parser (parser.ml)
+     tokens -> typed AST nodes
+         |
+         v
+  3. Evaluator (eval.ml)
+     AST + execution environment
+         |
+         v
+  Program output + variable bindings
 ```
 
-### 1. Lexing — source to tokens
+The **lexer** walks the source string and identifies integer and boolean literals, identifiers, keywords, delimiters, and operators. The **parser** applies an operator-precedence grammar and assembles tokens into expression, statement, and function-definition nodes. The **evaluator** recursively traverses those nodes and keeps an environment of declared variables and function definitions, reporting errors for unsupported operations or invalid usage.
 
-The lexer walks the source one character at a time. It scans integer literals and identifiers, recognizes keywords (`int`, `bool`, `if`, `else`, `while`, `for`, `return`, `printf`), and matches compound operators such as `==`, `!=`, `>=`, `<=`, `&&`, and `||` before their single-character alternatives. Unknown characters raise an input exception.
+### 1. Lexing: recognizing program structure
 
-### 2. Parsing — tokens to syntax
+[`src/lexer.ml`](src/lexer.ml) is a hand-written tokenizer. It uses short character-scanning helpers to find numeric literals and identifiers, recognizes keywords such as `int`, `bool`, `if`, `while`, `for`, and `return`, and gives multi-character operators (`==`, `!=`, `<=`, `>=`, `&&`, `||`) priority over single-character tokens. Invalid characters raise an input exception rather than being ignored.
 
-The recursive-descent parser builds typed AST nodes from the token stream. Its expression functions are organized by operator precedence: literals and variables, function calls, unary negation, powers, multiplication/division, addition/subtraction, comparisons, equality, logical AND, and logical OR. Each stage returns both the expression it parsed and the remaining tokens.
+### 2. Parsing: tokens to an AST
 
-The statement parser handles declarations, assignments, printing, conditional branches, `while` loops, inclusive-range `for` loops, and returns. A top-level parser assembles function definitions followed by `int main()`, while checking certain duplicate names and syntax errors.
+[`src/parser.ml`](src/parser.ml) uses recursive descent to implement expression precedence, function calls, and nested control flow.
 
-### 3. Evaluation — syntax to behavior
+- Expression layers: literals/variables/calls, negation, exponentiation, multiplication/division, addition/subtraction, comparisons, equality, AND, then OR.
+- Statements: declarations, typed assignments, printing, `if`/`else`, `while`, and inclusive-range `for` loops.
+- Function definitions: typed parameters, a return expression, a required `int main()` entry point, and checks for duplicate function/parameter names.
 
-The evaluator traverses the AST, carrying an environment of variable bindings and function definitions. It performs arithmetic and boolean operations, evaluates conditions, updates variables, executes loops, and invokes user-defined functions with their own parameter bindings.
+Each parsing function returns **the unconsumed tokens together with its AST node**, making nested expressions and statements composable. The AST variants live in [`src/smallCTypes.ml`](src/smallCTypes.ml).
 
-It checks runtime value types and raises explicit exceptions for issues such as undeclared identifiers, invalid operations, wrong argument types, and division by zero. **The output is produced by executing the program, not just printing its syntax tree.**
+### 3. Evaluation: running the AST
 
-## Example: function call
+[`src/eval.ml`](src/eval.ml) interprets expression and statement nodes while carrying an execution environment:
 
-`examples/function-call.c`:
+- **Expressions:** arithmetic, exponentiation, comparisons, boolean operations, variables, and calls to user-defined functions.
+- **Type handling:** checks integer and boolean operands, assignment types, function argument types, and return types.
+- **Execution:** sequential statements, branching, `while` loops, inclusive `for` loops, `printf(...)`, and `return`.
+- **Functions:** evaluates arguments, binds parameters in a new function-local environment, and returns the resulting value.
+- **Failures:** reports undeclared identifiers, type mismatches, invalid input, and division by zero through explicit exceptions.
+
+The result is an actual interpreter: program state changes as each statement executes, rather than simply displaying parsed syntax.
+
+## Example
+
+The included [`examples/function-call.c`](examples/function-call.c) demonstrates a user-defined function, declaration, assignment, call, print, and return:
 
 ```c
 int square(int x) {
@@ -58,65 +72,74 @@ int main() {
 }
 ```
 
-Expected output:
+Expected terminal output:
 
 ```text
 25
 ```
 
-More examples in `examples/` demonstrate a sum computed with `for` and a `while` loop followed by an `if/else` branch.
+More examples cover a `for` loop and combined `while`/`if` execution in [`examples/`](examples/).
 
-## Source layout
+## Run it locally
 
-| File | Purpose |
-| --- | --- |
-| [`src/lexer.ml`](src/lexer.ml) | Character scanning and token generation |
-| [`src/parser.ml`](src/parser.ml) | Recursive-descent parsing, grammar precedence, AST construction |
-| [`src/eval.ml`](src/eval.ml) | Expression evaluation, statement execution, functions |
-| [`src/tokenTypes.ml`](src/tokenTypes.ml) | Token variants |
-| [`src/smallCTypes.ml`](src/smallCTypes.ml) | AST, values, and environment data types |
-| [`src/utils.ml`](src/utils.ml) | I/O, formatting, and environment helpers |
-| [`bin/interface.ml`](bin/interface.ml) | CLI: lexical analysis, parsing, and evaluation |
-| [`examples/`](examples/) | Standalone SmallC example programs |
-| [`scripts/smoke-test.sh`](scripts/smoke-test.sh) | Build and simple output checks |
-
-## Build and run
-
-Requires OCaml, Dune, and `ppx_deriving` for generated AST printers.
+Requires **OCaml**, **Dune** (compatible with the `dune-project` file), and the **ppx_deriving** package for AST printers. With opam:
 
 ```bash
 opam install dune ppx_deriving
-dune build
 ```
 
-From the project directory, the CLI exposes three modes:
+From the `smallc-interpreter` directory, build and run:
 
 ```bash
-# Print the token stream
+dune build
+
 dune exec bin/interface.exe -- lex examples/function-call.c
-
-# Print the parsed AST
 dune exec bin/interface.exe -- parse examples/function-call.c
-
-# Execute the SmallC program
 dune exec bin/interface.exe -- eval examples/function-call.c
-
-# Execute and display final variable bindings
-dune exec bin/interface.exe -- eval examples/function-call.c --report
 ```
 
-To build and compare the example outputs on Linux/macOS or WSL:
+- `lex` displays the tokens.
+- `parse` displays the generated AST.
+- `eval` executes the program and prints its output.
+- `eval <file> --report` also displays the final environment.
+- `eval <file> --unparse` displays a statement-tree representation instead of executing.
+
+On Linux/macOS (or WSL), run the small included smoke-test suite:
 
 ```bash
 bash scripts/smoke-test.sh
 ```
 
-**Verification note:** The source has undergone static review, but the OCaml build and smoke checks still need to run on a machine with the OCaml toolchain installed.
+The script builds the project and compares output from three examples. **The script has not been executed in this packaging environment** because the OCaml toolchain is not installed here.
 
-## Scope and limitations
+## Files
 
-SmallC is intentionally a small teaching language, **not a complete C compiler**. Its `for (i from start to end)` syntax differs from standard C; variable names must start with letters; and functions are expected to finish with a return. The tokenizer's handling of adjacent subtraction and signed integer literals also has limitations, so `a - 1` is preferable to `a-1`.
+```text
+smallc-interpreter/
+├── README.md
+├── dune-project
+├── dune
+├── .gitignore
+├── src/
+│   ├── lexer.ml / lexer.mli          # Text -> tokens
+│   ├── parser.ml / parser.mli        # Tokens -> AST
+│   ├── eval.ml / eval.mli            # AST -> execution
+│   ├── tokenTypes.ml                 # Token definitions
+│   ├── smallCTypes.ml                # AST + environment types
+│   ├── utils.ml                      # Printing / parsing helpers
+│   └── dune
+├── bin/
+│   ├── interface.ml                  # Command-line driver
+│   └── dune
+├── examples/                        # SmallC programs
+└── scripts/
+    └── smoke-test.sh
+```
 
-## Why I like this project
+## Important limitations
 
-The most interesting challenge is making the individual stages work together. Lexing is about scanning characters accurately, parsing is about enforcing grammar and precedence, and evaluation is about keeping program state consistent across nested expressions, branches, loops, and functions. It's a hands-on introduction to the core ideas behind interpreters, compilers, query languages, and developer tooling.
+SmallC is a deliberately small teaching language, **not a full C compiler**. It uses its own syntax and AST, including a `for (index from start to end)` loop, and intentionally does not support many standard C features. Its lexer accepts identifiers beginning with letters, not underscores, and subtraction next to positive integer literals can require whitespace (for example `a - 1`). Its supported grammar expects a return statement at the end of each function body. This project is intended to demonstrate language processing and interpreter design rather than C compatibility or production language tooling.
+
+## Why this project matters
+
+The interesting part is how the separate modules fit together. Lexing is a character-level problem; parsing introduces a formal grammar and precedence; evaluating requires recursive execution, variable environments, functions, and error handling. Connecting all three demonstrates the mechanics behind languages, compilers, expression engines, and other tools that turn human-readable text into structured behavior.
